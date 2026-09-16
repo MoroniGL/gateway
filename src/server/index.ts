@@ -57,7 +57,6 @@ const app = next({ dev, hostname, port });
 const handle = app.getRequestHandler();
 
 app.prepare().then(() => {
-  let heartbeatInterval: NodeJS.Timeout | null = null;
   let keepAliveInterval: NodeJS.Timeout | null = null;
 
   const server = createServer(async (req, res) => {
@@ -122,42 +121,6 @@ app.prepare().then(() => {
   server.listen(port, () => {
     logger.banner(pkg.name.toUpperCase(), pkg.version, port);
 
-    // --- WA-AKG Monitor Heartbeat ---
-    // Sends a ping every 30 seconds to the monitoring server
-    // Hanya untuk dokumentasi ada berapa layanan WA-AKG yang aktif. 
-    // Hanya untuk memantau tidak bermaksud lain. Semakin banyak WA-AKG yang aktif = semakin semangat saya mengembangkan WA-AKG ini.
-    // Terima kasih telah menggunakan WA-AKG.
-    const MONITOR_URL = "https://api-wa-akg.aikeigroup.net/api/ping";
-    const APP_URL = process.env.BASE_URL || `http://${hostname}:${port}`; // Kamu bisa mengganti ini untuk keamanan WA-AKG kamu. Tapi jangan menghapus semua Heartbeat nya. Terima Kasih.
-    const APP_NAME = process.env.APP_NAME || "WA-AKG";
-
-    const sendHeartbeat = async () => {
-      try {
-        await fetch(MONITOR_URL, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            appUrl: APP_URL,
-            appName: APP_NAME,
-            isBackend: true,
-            systemInfo: {
-              platform: process.platform,
-              nodeVersion: process.version,
-              memoryUsage: Math.round(process.memoryUsage().rss / 1024 / 1024) + "MB"
-            }
-          }),
-        });
-      } catch (error) {
-        // Silently fail to not disturb the main application
-      }
-    };
-
-    // Initial ping
-    sendHeartbeat();
-    // Interval ping
-    heartbeatInterval = setInterval(sendHeartbeat, 30000);
-    // --------------------------------
-
     // --- Self keep-alive (anti idle-sleep) ---
     // Beberapa platform (mis. Render free) menidurkan service kalau tidak ada
     // trafik HTTP masuk → sesi WhatsApp ikut mati. Ping URL publik sendiri
@@ -194,8 +157,7 @@ app.prepare().then(() => {
       logger.info("Server", "HTTP server closed");
     });
 
-    // Clear heartbeat
-    if (heartbeatInterval) clearInterval(heartbeatInterval);
+    // Clear timers
     if (keepAliveInterval) clearInterval(keepAliveInterval);
 
     // Close socket.io connections

@@ -51,7 +51,15 @@ export class ChatService {
 
         const contactMap = new Map();
         contacts.forEach(c => contactMap.set(c.jid, c));
-        groups.forEach(g => contactMap.set(g.jid, { jid: g.jid, name: g.subject, notify: g.subject, profilePic: null }));
+        groups.forEach(g => {
+            const existing = contactMap.get(g.jid);
+            contactMap.set(g.jid, {
+                jid: g.jid,
+                name: g.subject,
+                notify: g.subject,
+                profilePic: existing?.profilePic || null
+            });
+        });
 
         // For newsletter/channel JIDs without a name, try to get pushName from their messages
         const allNewsletterJids = Array.from(allJids).filter(jid => jid.endsWith("@newsletter"));
@@ -196,27 +204,43 @@ export class ChatService {
     static async getMessages(dbSessionId: string, jid: string, take: number = 100) {
         // Query with normalized JID to handle @c.us / @s.whatsapp.net variations
         const normalizedJid = normalizeJid(jid);
+        const isGroup = jid.endsWith("@g.us");
+        const isNewsletter = jid.endsWith("@newsletter");
         
-        // Find if this contact has both LID and Phone JID in the database
-        const contact = await prisma.contact.findFirst({
-            where: {
-                sessionId: dbSessionId,
-                OR: [{ jid: jid }, { lid: jid }, { remoteJidAlt: jid }, { jid: normalizedJid }]
-            },
-            select: { jid: true, lid: true, remoteJidAlt: true }
-        });
-
         const queryJids = new Set([jid, normalizedJid]);
-        if (contact) {
-            if (contact.jid) queryJids.add(contact.jid);
-            if (contact.lid) queryJids.add(contact.lid);
-            if (contact.remoteJidAlt) queryJids.add(contact.remoteJidAlt);
+
+        // Only search contact aliases for individual 1-on-1 chats
+        if (!isGroup && !isNewsletter) {
+            const contact = await prisma.contact.findFirst({
+                where: {
+                    sessionId: dbSessionId,
+                    OR: [{ jid: jid }, { lid: jid }, { remoteJidAlt: jid }, { jid: normalizedJid }]
+                },
+                select: { jid: true, lid: true, remoteJidAlt: true }
+            });
+
+            if (contact) {
+                if (contact.jid) queryJids.add(contact.jid);
+                if (contact.lid) queryJids.add(contact.lid);
+                if (contact.remoteJidAlt) queryJids.add(contact.remoteJidAlt);
+            }
         }
 
         const messages = await prisma.message.findMany({
             where: {
                 sessionId: dbSessionId,
                 remoteJid: { in: Array.from(queryJids) }
+            },
+            select: {
+                keyId: true,
+                remoteJid: true,
+                fromMe: true,
+                pushName: true,
+                type: true,
+                content: true,
+                mediaUrl: true,
+                status: true,
+                timestamp: true,
             },
             orderBy: { timestamp: 'desc' },
             take
