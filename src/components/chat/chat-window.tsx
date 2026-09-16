@@ -289,40 +289,91 @@ export function ChatWindow({ sessionId, jid, name, profilePic, onProfilePicLoade
     // --- Voice Recording Logic ---
     const startVoiceRecording = async () => {
         try {
-            // Check for secure context and MediaDevices support
-            if (!navigator?.mediaDevices?.getUserMedia) {
+            // Helper to get media devices across browsers
+            const getMediaDevices = () => {
+                if (typeof navigator === "undefined") return null;
+                if (navigator.mediaDevices) {
+                    return navigator.mediaDevices;
+                }
+                const legacyGetUserMedia = 
+                    (navigator as any).getUserMedia || 
+                    (navigator as any).webkitGetUserMedia || 
+                    (navigator as any).mozGetUserMedia || 
+                    (navigator as any).msGetUserMedia;
+                if (legacyGetUserMedia) {
+                    return {
+                        getUserMedia: (constraints: MediaStreamConstraints) => {
+                            return new Promise<MediaStream>((resolve, reject) => {
+                                legacyGetUserMedia.call(navigator, constraints, resolve, reject);
+                            });
+                        }
+                    };
+                }
+                return null;
+            };
+
+            const mediaDevices = getMediaDevices();
+
+            if (!mediaDevices) {
                 if (
                     typeof window !== "undefined" &&
                     window.location.protocol !== "https:" &&
                     window.location.hostname !== "localhost" &&
                     window.location.hostname !== "127.0.0.1"
                 ) {
-                    toast.error("Microphone requires HTTPS or http://localhost. Please open http://localhost:3030");
+                    toast.error("Microphone requires HTTPS or http://localhost. Please access via localhost.");
                     return;
                 }
                 toast.error("Microphone recording is not supported in this browser.");
                 return;
             }
 
-            const stream = await navigator.mediaDevices.getUserMedia({ 
-                audio: {
-                    echoCancellation: true,
-                    noiseSuppression: true,
-                    autoGainControl: true,
-                } 
-            });
+            // Attempt to get user media - with fallback to simple audio if advanced constraints fail
+            let stream: MediaStream;
+            try {
+                stream = await mediaDevices.getUserMedia({ 
+                    audio: {
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        autoGainControl: true,
+                    } 
+                });
+            } catch (constraintErr: any) {
+                console.warn("Advanced audio constraints failed, trying basic audio: true", constraintErr);
+                stream = await mediaDevices.getUserMedia({ audio: true });
+            }
+
             mediaStreamRef.current = stream;
 
-            const mimeType = typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-                ? 'audio/webm;codecs=opus'
-                : typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported('audio/ogg;codecs=opus')
-                ? 'audio/ogg;codecs=opus'
-                : typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported('audio/mp4')
-                ? 'audio/mp4'
-                : '';
+            // Determine best supported MIME type
+            const mimeTypes = [
+                'audio/webm;codecs=opus',
+                'audio/webm',
+                'audio/ogg;codecs=opus',
+                'audio/ogg',
+                'audio/mp4',
+                'audio/aac'
+            ];
 
-            const options = mimeType ? { mimeType } : undefined;
-            const recorder = new MediaRecorder(stream, options);
+            let selectedMimeType = '';
+            if (typeof MediaRecorder !== "undefined") {
+                for (const mime of mimeTypes) {
+                    if (MediaRecorder.isTypeSupported(mime)) {
+                        selectedMimeType = mime;
+                        break;
+                    }
+                }
+            }
+
+            let recorder: MediaRecorder;
+            try {
+                recorder = selectedMimeType 
+                    ? new MediaRecorder(stream, { mimeType: selectedMimeType })
+                    : new MediaRecorder(stream);
+            } catch {
+                recorder = new MediaRecorder(stream);
+            }
+
             mediaRecorderRef.current = recorder;
             audioChunksRef.current = [];
 
@@ -344,15 +395,15 @@ export function ChatWindow({ sessionId, jid, name, profilePic, onProfilePicLoade
             console.error("Microphone access error:", err);
             const errName = err?.name || "";
             if (errName === "NotAllowedError" || errName === "PermissionDeniedError") {
-                toast.error("Microphone permission was denied. Please click the lock/settings icon near your browser address bar and allow Microphone access.");
+                toast.error("Microphone permission was denied. Please click the icon in your browser URL bar and allow Microphone access, then refresh.");
             } else if (errName === "NotFoundError" || errName === "DevicesNotFoundError") {
                 toast.error("No microphone device found on your computer.");
             } else if (errName === "NotReadableError" || errName === "TrackStartError") {
-                toast.error("Microphone is currently in use by another app.");
+                toast.error("Microphone is currently in use by another application.");
             } else if (errName === "SecurityError") {
-                toast.error("Microphone requires http://localhost:3030 or HTTPS.");
+                toast.error("Microphone requires http://localhost or HTTPS.");
             } else {
-                toast.error(err.message || "Could not access microphone. Please check browser permissions.");
+                toast.error(err.message || "Could not access microphone. Please check permissions.");
             }
         }
     };
