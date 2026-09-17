@@ -12,13 +12,21 @@ interface ChatLayoutClientProps {
 interface SelectedChat {
     jid: string;
     name?: string;
+    profilePic?: string | null;
 }
 
 export function ChatLayoutClient({ sessionId }: ChatLayoutClientProps) {
     const [selectedChat, setSelectedChat] = useState<SelectedChat | null>(null);
+    const [profilePicMap, setProfilePicMap] = useState<Record<string, string>>({});
 
-    const handleSelectChat = (jid: string, name?: string) => {
-        setSelectedChat({ jid, name });
+    const handleSelectChat = (jid: string, name?: string, profilePic?: string | null) => {
+        const effectivePic = profilePic || profilePicMap[jid] || null;
+        setSelectedChat({ jid, name, profilePic: effectivePic });
+    };
+
+    const handleProfilePicLoaded = (jid: string, url: string) => {
+        setProfilePicMap(prev => ({ ...prev, [jid]: url }));
+        setSelectedChat(prev => (prev && prev.jid === jid ? { ...prev, profilePic: url } : prev));
     };
 
     const handleBack = () => {
@@ -40,6 +48,7 @@ export function ChatLayoutClient({ sessionId }: ChatLayoutClientProps) {
                     sessionId={sessionId}
                     onSelectChat={handleSelectChat}
                     selectedJid={selectedChat?.jid}
+                    externalProfilePics={profilePicMap}
                 />
             </div>
 
@@ -57,6 +66,8 @@ export function ChatLayoutClient({ sessionId }: ChatLayoutClientProps) {
                         sessionId={sessionId}
                         jid={selectedChat.jid}
                         name={selectedChat.name}
+                        profilePic={selectedChat.profilePic || profilePicMap[selectedChat.jid] || null}
+                        onProfilePicLoaded={(url) => handleProfilePicLoaded(selectedChat.jid, url)}
                         onBack={handleBack}
                     />
                 ) : (

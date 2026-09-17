@@ -10,7 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 import { cn } from "@/lib/utils";
 import { createAppSocket } from "@/lib/socket-client";
-import { getChatsStatus } from "@/app/dashboard/chat/actions";
+import { getChatsStatus, getBatchProfilePictures } from "@/app/dashboard/chat/actions";
 
 interface ChatContact {
     jid: string;
@@ -26,11 +26,12 @@ interface ChatContact {
 
 interface ChatListProps {
     sessionId: string;
-    onSelectChat: (jid: string, name?: string) => void;
+    onSelectChat: (jid: string, name?: string, profilePic?: string | null) => void;
     selectedJid?: string;
+    externalProfilePics?: Record<string, string>;
 }
 
-export function ChatList({ sessionId, onSelectChat, selectedJid }: ChatListProps) {
+export function ChatList({ sessionId, onSelectChat, selectedJid, externalProfilePics }: ChatListProps) {
     const [chats, setChats] = useState<ChatContact[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState("");
@@ -124,6 +125,51 @@ export function ChatList({ sessionId, onSelectChat, selectedJid }: ChatListProps
     useEffect(() => {
         jidsInList.current = new Set(chats.map(c => c.jid));
     }, [chats]);
+
+    // Automatically load profile pictures for all chats that don't have one yet in background
+    useEffect(() => {
+        if (!sessionId || chats.length === 0) return;
+
+        const missingJids = chats
+            .filter((c) => !c.profilePic && !externalProfilePics?.[c.jid])
+            .map((c) => c.jid);
+
+        if (missingJids.length === 0) return;
+
+        let isCancelled = false;
+
+        const loadAllMissing = async () => {
+            // Wait 1.5s so initial chat renders and message loading take immediate priority
+            await new Promise((r) => setTimeout(r, 1500));
+            if (isCancelled) return;
+
+            // Process in smaller batches of 6 with pauses so socket & network are never saturated
+            for (let i = 0; i < missingJids.length; i += 6) {
+                if (isCancelled) break;
+                const batch = missingJids.slice(i, i + 6);
+                try {
+                    const res = await getBatchProfilePictures(sessionId, batch);
+                    if (res && Object.keys(res).length > 0 && !isCancelled) {
+                        setChats((prev) =>
+                            prev.map((chat) =>
+                                res[chat.jid] ? { ...chat, profilePic: res[chat.jid] } : chat
+                            )
+                        );
+                    }
+                } catch {
+                    // ignore chunk errors and continue
+                }
+                // Small pause between batches
+                await new Promise((r) => setTimeout(r, 200));
+            }
+        };
+
+        loadAllMissing();
+
+        return () => {
+            isCancelled = true;
+        };
+    }, [chats.length, sessionId]);
 
     // Filter chats based on search query and active tab
     const filteredChats = useMemo(() => {
@@ -351,6 +397,7 @@ export function ChatList({ sessionId, onSelectChat, selectedJid }: ChatListProps
                     filteredChats.map((chat) => {
                         const displayName = getContactDisplayName(chat);
                         const isSelected = selectedJid === chat.jid;
+                        const effectivePic = chat.profilePic || externalProfilePics?.[chat.jid] || "";
                         return (
                             <button
                                 key={chat.jid}
@@ -360,10 +407,12 @@ export function ChatList({ sessionId, onSelectChat, selectedJid }: ChatListProps
                                         ? "bg-primary/8 border-l-2 border-l-primary"
                                         : "hover:bg-muted/40 border-l-2 border-l-transparent"
                                 )}
-                                onClick={() => onSelectChat(chat.jid, displayName)}
+                                onClick={() => onSelectChat(chat.jid, displayName, effectivePic || null)}
                             >
                                 <Avatar className="h-10 w-10 flex-shrink-0">
-                                    <AvatarImage src={chat.profilePic || ""} />
+                                    {effectivePic ? (
+                                        <AvatarImage src={effectivePic} alt={displayName} className="object-cover" />
+                                    ) : null}
                                     <AvatarFallback className="text-xs font-medium bg-gradient-to-br from-primary/20 to-blue-500/20 text-primary">
                                         {displayName.slice(0, 2).toUpperCase()}
                                     </AvatarFallback>

@@ -116,6 +116,8 @@ model Contact {
   messages    Message[]
 
   @@unique([sessionId, jid])
+  @@index([sessionId, lid])
+  @@index([sessionId, remoteJidAlt])
 }
 
 model Message {
@@ -139,6 +141,8 @@ model Message {
   session     Session       @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
   @@unique([sessionId, keyId])
+  @@index([sessionId, remoteJid, timestamp(sort: Desc)])
+  @@index([sessionId, timestamp(sort: Desc)])
   @@index([sessionId, remoteJid])
 }
 
