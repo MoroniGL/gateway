@@ -17,7 +17,6 @@ ENV NEXT_TELEMETRY_DISABLED=1
 FROM base AS deps
 COPY package.json package-lock.json* ./
 COPY prisma ./prisma
-COPY patches ./patches
 # butuh devDependencies juga (next build + next-swagger-doc dipakai runtime)
 RUN npm ci || npm install
 RUN npx prisma generate

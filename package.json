@@ -9,8 +9,7 @@
     "lint": "eslint",
     "db:push": "prisma db push && prisma generate",
     "db:studio": "prisma studio",
-    "make-admin": "node scripts/setup-admin.js",
-    "postinstall": "patch-package"
+    "make-admin": "node scripts/setup-admin.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
@@ -42,9 +41,7 @@
     "next-auth": "5.0.0-beta.32",
     "nextjs-toploader": "^3.9.17",
     "node-cron": "^4.2.1",
-    "patch-package": "^8.0.1",
     "pino": "^10.1.0",
-    "postinstall-postinstall": "^2.1.0",
     "prisma": "^5.22.0",
     "qrcode": "^1.5.4",
     "qrcode.react": "^4.2.0",
