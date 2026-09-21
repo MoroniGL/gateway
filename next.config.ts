@@ -1,5 +1,4 @@
 import type { NextConfig } from "next";
-import path from "path";
 
 const nextConfig: NextConfig = {
   experimental: {
@@ -9,7 +8,7 @@ const nextConfig: NextConfig = {
   },
   serverExternalPackages: ["sharp", "bcryptjs"],
   turbopack: {
-    root: path.resolve(__dirname),
+    root: process.cwd(),
   },
   outputFileTracingExcludes: {
     "*": ["./data/media/**"],

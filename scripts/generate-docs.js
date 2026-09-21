@@ -1,4 +1,4 @@
-const fs = require('fs');
+import fs from 'node:fs';
 const swagger = JSON.parse(fs.readFileSync('swagger.json', 'utf8'));
 
 const BASE_URL = swagger.servers?.[0]?.url || 'http://localhost:3000/api';

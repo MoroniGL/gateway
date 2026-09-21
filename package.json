@@ -2,10 +2,11 @@
   "name": "wa-akg",
   "version": "1.5.4",
   "private": false,
+  "type": "module",
   "scripts": {
-    "dev": "npx tsx src/server/bootstrap.ts",
+    "dev": "npx tsx src/server/bootstrap.mts",
     "build": "prisma generate && next build",
-    "start": "npx tsx src/server/bootstrap.ts",
+    "start": "npx tsx src/server/bootstrap.mts",
     "lint": "eslint",
     "db:push": "prisma db push && prisma generate",
     "db:studio": "prisma studio",
