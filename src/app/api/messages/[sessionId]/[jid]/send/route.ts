@@ -30,9 +30,17 @@ export async function POST(
         }
 
         // Send Message using ChatService
-        await ChatService.sendTextMessage(sessionId, jid, message, mentions);
+        const sentMessage = await ChatService.sendTextMessage(sessionId, jid, message, mentions);
+        const providerMessageId = sentMessage?.key?.id;
+        if (!providerMessageId) {
+            throw new Error("WhatsApp accepted the request without a message ID");
+        }
 
-        return NextResponse.json({ status: true, message: "Message sent successfully" });
+        return NextResponse.json({
+            status: true,
+            message: "Message sent successfully",
+            data: { id: providerMessageId },
+        });
     } catch (error: any) {
         console.error("Send message error:", error);
         const errorMsg = error?.message || "Failed to send message";
