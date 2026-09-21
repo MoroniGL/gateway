@@ -2,7 +2,7 @@ import { NextResponse, NextRequest } from "next/server";
 import { waManager } from "@/modules/whatsapp/manager";
 import { canAccessSession } from "@/lib/api-auth";
 import { enforceApiQuota } from "@/lib/rate-limit";
-import Sticker from "wa-sticker-formatter";
+import Sticker from "@/lib/sticker-formatter";
 
 export async function POST(
     request: NextRequest,
