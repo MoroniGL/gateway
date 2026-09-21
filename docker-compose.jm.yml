@@ -1,0 +1,70 @@
+name: jm-wa-gateway
+
+x-gateway-environment: &gateway-environment
+  DATABASE_URL: ${GATEWAY_DATABASE_URL:?GATEWAY_DATABASE_URL is required}
+  AUTH_SECRET: ${GATEWAY_AUTH_SECRET:?GATEWAY_AUTH_SECRET is required}
+  AUTH_TRUST_HOST: "true"
+  BASE_URL: ${GATEWAY_PUBLIC_URL:?GATEWAY_PUBLIC_URL is required}
+  NEXTAUTH_URL: ${GATEWAY_PUBLIC_URL:?GATEWAY_PUBLIC_URL is required}
+  NEXT_PUBLIC_APP_URL: ${GATEWAY_PUBLIC_URL:?GATEWAY_PUBLIC_URL is required}
+  NEXT_PUBLIC_API_URL: ${GATEWAY_PUBLIC_URL:?GATEWAY_PUBLIC_URL is required}/api
+  CORS_ALLOW_ORIGIN: ${GATEWAY_PUBLIC_URL:?GATEWAY_PUBLIC_URL is required}
+  NODE_ENV: production
+  PORT: "3030"
+  TZ: Europe/London
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${GATEWAY_DB_NAME:?GATEWAY_DB_NAME is required}
+      POSTGRES_USER: ${GATEWAY_DB_USER:?GATEWAY_DB_USER is required}
+      POSTGRES_PASSWORD: ${GATEWAY_DB_PASSWORD:?GATEWAY_DB_PASSWORD is required}
+    volumes:
+      - gateway-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    networks: [gateway-private]
+
+  migrate:
+    build: .
+    image: jm-wa-gateway:local
+    command: ["npm", "run", "db:push"]
+    environment: *gateway-environment
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+    networks: [gateway-private]
+
+  gateway:
+    image: jm-wa-gateway:local
+    restart: unless-stopped
+    environment: *gateway-environment
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    ports:
+      - "127.0.0.1:3030:3030"
+    volumes:
+      - gateway-media:/app/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3030/api/health >/dev/null || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    networks: [gateway-private, gateway-egress]
+
+volumes:
+  gateway-postgres:
+  gateway-media:
+
+networks:
+  gateway-private:
+    internal: true
+  gateway-egress:
