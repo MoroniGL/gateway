@@ -7,7 +7,7 @@
 # Cocok untuk Railway / Render / Fly.io / VPS.
 # ============================================================
 
-FROM node:20-alpine AS base
+FROM node:22-alpine AS base
 # libc6-compat + openssl: untuk native module (sharp) & Prisma engine
 RUN apk add --no-cache libc6-compat openssl
 WORKDIR /app
