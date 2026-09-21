@@ -1,6 +1,6 @@
-const { createHash } = require("node:crypto");
-const bcrypt = require("bcryptjs");
-const { PrismaClient } = require("@prisma/client");
+import { createHash } from "node:crypto";
+import bcrypt from "bcryptjs";
+import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 

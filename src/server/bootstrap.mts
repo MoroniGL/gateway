@@ -44,7 +44,8 @@ loadEnvFile(".env.local");
 loadEnvFile(".env");
 
 // Baru import server utama — sekarang Prisma dll. baca DATABASE_URL yang benar.
-// TANPA top-level await (root bukan "type: module" → tsx transpile ke CJS).
+// Keep this entry point as .mts so ESM-only dependencies (Baileys' Rust
+// bridge) are loaded through their supported import export.
 import("./index.js").catch((e) => {
     console.error("Gagal start server:", e);
     process.exit(1);

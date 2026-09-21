@@ -1,5 +1,5 @@
 
-const net = require('net');
+import net from 'node:net';
 
 function checkConnection(port, host) {
     const client = new net.Socket();
